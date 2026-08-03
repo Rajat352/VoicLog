@@ -19,6 +19,7 @@ import androidx.navigation3.ui.NavDisplay
 import com.voiclog.ui.screens.log.LogScreen
 import com.voiclog.ui.screens.record.RecordScreen
 import com.voiclog.ui.screens.settings.SettingsScreen
+import com.voiclog.ui.theme.VoicLogTypography
 
 @Composable
 fun RootNav(
@@ -42,7 +43,10 @@ fun RootNav(
                                 )
                             },
                             label = {
-                                Text(it.label)
+                                Text(
+                                    text = it.label,
+                                    style = VoicLogTypography.labelMedium
+                                )
                             },
                             onClick = {
                                 backStack.switchTab(it.route)

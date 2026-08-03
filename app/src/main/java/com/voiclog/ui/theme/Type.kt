@@ -8,7 +8,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.voiclog.R
 
-
 private val Sans = FontFamily(
     Font(R.font.instrument_sans_regular,  FontWeight.Normal),
     Font(R.font.instrument_sans_medium,   FontWeight.Medium),
@@ -18,7 +17,7 @@ private val Mono = FontFamily(
     Font(R.font.ibm_plex_mono_medium, FontWeight.Medium),
 )
 
-val VoicLogType = Typography(
+val VoicLogTypography = Typography(
     displayMedium = TextStyle(
         fontFamily =  Sans,
         fontWeight = FontWeight.SemiBold,
