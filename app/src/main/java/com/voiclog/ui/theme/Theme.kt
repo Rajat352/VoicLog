@@ -76,7 +76,7 @@ fun VoicLogTheme(
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
-        darkTheme -> DarkColorScheme
+        darkTheme -> DuskLight
         else -> DuskLight
     }
 
