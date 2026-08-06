@@ -6,6 +6,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,12 +34,18 @@ import com.voiclog.ui.screens.record.state.CaptureState
 import com.voiclog.ui.theme.VoicLogTypography
 
 @Composable
-fun RecordScreenCapture() {
+fun RecordScreenCapture(
+    captureState: CaptureState,
+    onToggleCapture: () -> Unit
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        CaptureGlyph(captureState = CaptureState.Idle)
+        CaptureGlyph(
+            captureState = captureState,
+            onToggleCapture = onToggleCapture
+        )
 
         Text(
             text = "Tap to say what you did today",
@@ -47,9 +56,11 @@ fun RecordScreenCapture() {
 
 @Composable
 fun CaptureGlyph(
-    captureState: CaptureState
+    captureState: CaptureState,
+    onToggleCapture: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
 
     // Idle and Disabled appear on Home at the size of the control itself.
     // Recording and Processing appear on Record, inside the 288dp stage the
@@ -60,7 +71,17 @@ fun CaptureGlyph(
     }
 
     Box(
-        modifier = Modifier.size(stageSize),
+        modifier = Modifier
+            .size(stageSize)
+            .clickable(
+                enabled = when (captureState) {
+                    CaptureState.Idle, is CaptureState.Recording -> true
+                    else -> false
+                },
+                onClick = { onToggleCapture() },
+                interactionSource = interactionSource,
+                indication = null
+            ),
         contentAlignment = Alignment.Center
     ) {
         if (captureState is CaptureState.Recording) {
