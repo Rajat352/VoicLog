@@ -12,6 +12,7 @@ import com.voiclog.ui.screens.record.state.CaptureState
 import com.voiclog.ui.screens.record.state.RecordScreenState
 import com.voiclog.ui.screens.record.state.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,6 +77,12 @@ class RecordScreenViewModel @Inject constructor(
                     // Todo: Handle else here to maybe show something like why permission is needed and necessary
                 }
             }
+        }
+    }
+
+    override fun onCleared() {
+        viewModelScope.launch(NonCancellable) {
+            audioRecorder.cancel()
         }
     }
 

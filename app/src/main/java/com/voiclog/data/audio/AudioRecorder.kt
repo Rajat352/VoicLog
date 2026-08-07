@@ -1,8 +1,11 @@
 package com.voiclog.data.audio
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioFormat
+import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -10,8 +13,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +24,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.RandomAccessFile
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import kotlin.math.abs
 
 interface AudioRecorder {
     val state: StateFlow<AudioRecorderState>
@@ -35,55 +42,58 @@ class AudioRecorderImpl(
 ): AudioRecorder {
 
     private val mutex = Mutex()
-    private var mediaRecorder: MediaRecorder? = null
+    private var audioRecord: AudioRecord? = null
+    private var recordingJob: Job? = null
+    private val recordingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var file: File? = null
 
     private val _state = MutableStateFlow<AudioRecorderState>(AudioRecorderState.Idle)
     override val state: StateFlow<AudioRecorderState> = _state.asStateFlow()
 
-    private val pollingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var pollingJob: Job? = null
-
     override fun hasRecordPermission(): Boolean = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
+    @SuppressLint("MissingPermission")
     override suspend fun start(): Result<Unit> = mutex.withLock {
         withContext(Dispatchers.IO) {
+            if (audioRecord != null) return@withContext Result.failure(IllegalStateException("Already recording"))
 
-            if (mediaRecorder != null) return@withContext Result.failure(IllegalStateException("Already recording"))
+            if (!hasRecordPermission()) return@withContext Result.failure(SecurityException("RECORD_AUDIO permission is not granted"))
 
-            if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                return@withContext Result.failure(SecurityException("RECORD_AUDIO permission is not granted"))
-            }
+            val minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_ENCODING)
+            val bufferSizeBytes = minBufferSize * 4
 
-            val outputDir = File(context.filesDir, "recordings").apply { mkdirs() }
-            val outputFile = File(outputDir, "rec_${System.currentTimeMillis()}.m4a")
+            val outputDir = File(context.cacheDir, "recordings").apply { mkdirs() }
+            val outputFile = File(outputDir, "rec_${System.currentTimeMillis()}.wav")
 
 
             try {
 
-                val recorder = MediaRecorder(context).apply {
-                    setAudioSource(MediaRecorder.AudioSource.MIC)
-                    setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                    setOutputFile(outputFile)
-                    setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                    setOnErrorListener { _, what, extra ->
-                        Log.e(TAG, "MediaRecorder error: what:$what extra:$extra")
-                        pollingJob?.cancel()
-                        _state.value = AudioRecorderState.Idle
-                    }
-                    prepare()
-                    start()
+                val recorder = AudioRecord.Builder()
+                    .setAudioSource(MediaRecorder.AudioSource.MIC)
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setSampleRate(SAMPLE_RATE)
+                            .setChannelMask(CHANNEL_CONFIG)
+                            .setEncoding(AUDIO_ENCODING)
+                            .build()
+                    )
+                    .setBufferSizeInBytes(bufferSizeBytes)
+                    .build()
+
+                if (recorder.state == AudioRecord.STATE_UNINITIALIZED) {
+                    recorder.release()
+                    return@withContext Result.failure(IllegalStateException("AudioRecord failed to initialize"))
                 }
 
-                mediaRecorder = recorder
+                audioRecord = recorder
                 file = outputFile
+                recorder.startRecording()
                 _state.value = AudioRecorderState.Recording(0f)
-                pollingJob = pollingScope.launch { pollAmplitude() }
+                recordingJob = recordingScope.launch { captureLoop(recorder, outputFile, bufferSizeBytes) }
                 Result.success(Unit)
 
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to prepare MediaRecorder", e)
-                pollingJob?.cancel()
+                Log.e(TAG, "Failed to prepare AudioRecord", e)
                 releaseRecorderSafely()
                 outputFile.delete()
                 file = null
@@ -96,21 +106,21 @@ class AudioRecorderImpl(
     override suspend fun stop(): Result<File> = mutex.withLock {
         withContext(Dispatchers.IO) {
 
-            val recorder = mediaRecorder
+            val recorder = audioRecord
             val outputFile = file
 
             if (recorder == null || outputFile == null) {
                 return@withContext Result.failure(IllegalStateException("Not currently recording"))
             }
 
-            pollingJob?.cancel()
+            recordingJob?.cancelAndJoin()
             _state.value = AudioRecorderState.Idle
 
             try {
                 recorder.stop()
                 Result.success(outputFile)
             } catch (e: RuntimeException) {
-                Log.e(TAG, "Failed to stop MediaRecorder", e)
+                Log.e(TAG, "Failed to stop AudioRecord", e)
                 outputFile.delete()
                 Result.failure(e)
             } finally {
@@ -122,43 +132,68 @@ class AudioRecorderImpl(
 
     override suspend fun cancel(): Result<Unit> = mutex.withLock {
         withContext(Dispatchers.IO) {
-            pollingJob?.cancel()
+            val recorder = audioRecord
+            val outputFile = file
+
+            if (recorder == null || outputFile == null) {
+                return@withContext Result.failure(IllegalStateException("Not currently recording"))
+            }
+
+            recordingJob?.cancelAndJoin()
             _state.value = AudioRecorderState.Idle
 
-            val outputFile = file
-            runCatching { mediaRecorder?.stop() }
+            recorder.stop()
             releaseRecorderSafely()
-            outputFile?.delete()
+            outputFile.delete()
             file = null
+            Log.d(TAG, "cancel(): cleanup done")
             Result.success(Unit)
         }
     }
 
-    private suspend fun pollAmplitude() {
-        while (currentCoroutineContext().isActive) {
-            val amp = mutex.withLock {
-                runCatching { mediaRecorder?.maxAmplitude }.getOrNull() ?: 0
+    private suspend fun captureLoop(recorder: AudioRecord, outputFile: File, bufferSizeBytes: Int) {
+        val buffer = ShortArray(bufferSizeBytes / 2)
+        var pcmBytesWritten = 0L
+
+        RandomAccessFile(outputFile, "rw").use { raf ->
+            raf.write(ByteArray(WAV_HEADER_SIZE)) //placeholder, is updated once size in known
+
+            while (currentCoroutineContext().isActive) {
+                val sampleRead = recorder.read(buffer, 0, buffer.size)
+                if (sampleRead > 0) {
+                    val peak = (0 until sampleRead).maxOf { i -> abs(buffer[i].toInt()) }
+                    _state.value = AudioRecorderState.Recording((peak / MAX_AMPLITUDE).coerceIn(0f, 1f))
+
+                    val bytes = ByteBuffer.allocate(sampleRead * 2).order(ByteOrder.LITTLE_ENDIAN)
+                        .apply { for (i in 0 until sampleRead) putShort(buffer[i]) }
+                        .array()
+
+                    raf.write(bytes)
+                    pcmBytesWritten += bytes.size
+                }
             }
 
-            _state.value = AudioRecorderState.Recording((amp/MAX_AMPLITUDE).coerceIn(0f, 1f))
-            delay(AMPLITUDE_POLL_INTERVAL_MS)
+            raf.seek(0)
+            raf.write(buildWavHeader(pcmBytesWritten, SAMPLE_RATE, channels = 1, bitsPerSample = 16))
         }
     }
 
     private fun releaseRecorderSafely() {
         try {
-            mediaRecorder?.reset()
-            mediaRecorder?.release()
+            audioRecord?.stop()
         } catch (e: Exception) {
             Log.e(TAG, "An error occurred while releasing recorder", e)
-        } finally {
-            mediaRecorder = null
         }
+        audioRecord?.release()
+        audioRecord = null
     }
 
     companion object {
         private const val TAG = "AudioRecorderImpl"
-        private const val AMPLITUDE_POLL_INTERVAL_MS = 100L
         private const val MAX_AMPLITUDE = 32767f
+        private const val SAMPLE_RATE = 16000
+        private val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
+        private val AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT
+        private const val WAV_HEADER_SIZE = 44
     }
 }
