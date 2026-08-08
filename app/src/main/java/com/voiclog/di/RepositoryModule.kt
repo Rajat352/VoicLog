@@ -4,6 +4,7 @@ import com.voiclog.data.AppDatabase
 import com.voiclog.data.dao.RecordingDao
 import com.voiclog.data.repository.RecordingRepository
 import com.voiclog.data.repository.RecordingRepositoryImpl
+import com.voiclog.data.transcription.Transcriber
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,7 +23,7 @@ object RepositoryModule {
 
     @Singleton
     @Provides
-    fun provideRecordingRepository(recordingDao: RecordingDao): RecordingRepository {
-        return RecordingRepositoryImpl(recordingDao)
+    fun provideRecordingRepository(recordingDao: RecordingDao, transcriber: Transcriber): RecordingRepository {
+        return RecordingRepositoryImpl(recordingDao, transcriber)
     }
 }

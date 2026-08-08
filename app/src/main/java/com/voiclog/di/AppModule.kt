@@ -5,6 +5,8 @@ import androidx.room3.Room
 import com.voiclog.data.AppDatabase
 import com.voiclog.data.audio.AudioRecorder
 import com.voiclog.data.audio.AudioRecorderImpl
+import com.voiclog.data.transcription.Transcriber
+import com.voiclog.data.transcription.TranscriberImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -30,5 +32,11 @@ object AppModule {
             AppDatabase::class.java,
             "app_database"
         ).build()
+    }
+
+    @Singleton
+    @Provides
+    fun provideTranscriber(@ApplicationContext context: Context) : Transcriber {
+        return TranscriberImpl(context)
     }
 }
