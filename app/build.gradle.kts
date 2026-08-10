@@ -26,7 +26,10 @@ android {
         }
 
         externalNativeBuild {
-            cmake { cppFlags += "-std=c++17" }
+            cmake {
+                cppFlags += "-std=c++17"
+                arguments += "-DCMAKE_BUILD_TYPE=Release"
+            }
         }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

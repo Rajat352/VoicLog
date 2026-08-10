@@ -45,7 +45,7 @@ class RecordScreenViewModel @Inject constructor(
         RecordScreenState(
             uiState = uiState,
             captureState = when {
-                recorderState is AudioRecorderState.Recording -> CaptureState.Recording(recorderState.amplitude)
+                recorderState is AudioRecorderState.Recording -> CaptureState.Recording(recorderState.amplitude, recorderState.duration)
                 transcriberState is TranscriberState.Transcribing -> CaptureState.Processing(
                     ProcessingStep.TRANSCRIBING, transcriberState.progress)
                 transcriberState is TranscriberState.LoadingModel -> CaptureState.Processing(

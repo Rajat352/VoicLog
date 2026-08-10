@@ -9,12 +9,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.voiclog.ui.theme.Meta
 import com.voiclog.ui.theme.VoicLogTypography
+import java.util.Calendar
 
 @Composable
 fun RecordScreenTitle() {
@@ -33,8 +35,15 @@ fun RecordScreenTitle() {
 fun Greeting(
     name: String
 ) {
+    val greeting = remember {
+        when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
+            in 0..11 -> "Good morning"
+            in 12..16 -> "Good afternoon"
+            else -> "Good evening"
+        }
+    }
     Text(
-        text = "Good Evening, ${name}",
+        text = "$greeting, $name",
         style = VoicLogTypography.titleLarge
     )
 }

@@ -35,6 +35,7 @@ class TranscriberImpl(
             ensureLoaded()
             _state.value = TranscriberState.Transcribing(0f)
             val text = WhisperLib.fullTranscribe(whisperPtr, THREAD_COUNT, audioData) { progress ->
+                Log.d(TAG, "transcribe progress: $progress")
                 _state.value = TranscriberState.Transcribing(progress / 100f)
             }
             Result.success(text)
@@ -53,6 +54,7 @@ class TranscriberImpl(
             WhisperLib.initContextFromAsset(context.assets, MODEL_ASSET_PATH)
         }
         check(whisperPtr != 0L) { "Failed to load $MODEL_ASSET_PATH" }
+        Log.d(TAG, "Whisper model loaded successfully")
     }
 
     companion object {

@@ -31,6 +31,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.voiclog.R
 import com.voiclog.ui.screens.record.state.CaptureState
+import com.voiclog.ui.theme.Timer
 import com.voiclog.ui.theme.VoicLogTypography
 
 @Composable
@@ -48,8 +49,14 @@ fun RecordScreenCapture(
         )
 
         Text(
-            text = "Tap to say what you did today",
-            style = VoicLogTypography.bodyLarge
+            text = when(captureState) {
+                is CaptureState.Recording -> formatDuration(captureState.duration)
+                else -> "Tap to say what you did today"
+            },
+            style = when(captureState) {
+                is CaptureState.Recording -> Timer
+                else -> VoicLogTypography.bodyLarge
+            }
         )
     }
 }
@@ -194,6 +201,11 @@ private fun ProcessingRing(progress: Float) {
         strokeCap = StrokeCap.Round,
         gapSize = 0.dp
     )
+}
+
+private fun formatDuration(millis: Long): String {
+    val totalSeconds = millis / 1000
+    return "%d:%02d".format(totalSeconds / 60, totalSeconds % 60)
 }
 
 private val StageSize = 288.dp

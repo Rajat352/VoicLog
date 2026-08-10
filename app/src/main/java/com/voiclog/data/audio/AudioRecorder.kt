@@ -42,6 +42,7 @@ class AudioRecorderImpl(
     private var recordingJob: Job? = null
     private val recordingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var audioDataChunks: MutableList<FloatArray> = mutableListOf()
+    private var totalSamplesRead: Long = 0
 
     private val _state = MutableStateFlow<AudioRecorderState>(AudioRecorderState.Idle)
     override val state: StateFlow<AudioRecorderState> = _state.asStateFlow()
@@ -79,7 +80,8 @@ class AudioRecorderImpl(
 
                 audioRecord = recorder
                 recorder.startRecording()
-                _state.value = AudioRecorderState.Recording(0f)
+                totalSamplesRead = 0
+                _state.value = AudioRecorderState.Recording(0f, 0)
                 recordingJob = recordingScope.launch { captureLoop(recorder, bufferSizeBytes) }
                 Result.success(Unit)
 
@@ -103,6 +105,7 @@ class AudioRecorderImpl(
 
             try {
                 recorder.stop()
+                Log.d(TAG, "Audio chunks ready!")
                 Result.success(mergeAudioDataChunks(audioDataChunks))
             } catch (e: RuntimeException) {
                 Log.e(TAG, "Failed to stop AudioRecord", e)
@@ -136,8 +139,13 @@ class AudioRecorderImpl(
         while (currentCoroutineContext().isActive) {
             val sampleRead = recorder.read(buffer, 0, buffer.size)
             if (sampleRead > 0) {
+                totalSamplesRead += sampleRead
                 val peak = (0 until sampleRead).maxOf { i -> abs(buffer[i].toInt()) }
-                _state.value = AudioRecorderState.Recording((peak / MAX_AMPLITUDE).coerceIn(0f, 1f))
+                val durationMillis = totalSamplesRead * 1000L / SAMPLE_RATE
+                _state.value = AudioRecorderState.Recording(
+                    (peak / MAX_AMPLITUDE).coerceIn(0f, 1f),
+                    durationMillis
+                )
 
                 audioDataChunks += shortsToNormalizedFloats(buffer, sampleRead)
             }
