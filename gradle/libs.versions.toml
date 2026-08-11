@@ -10,9 +10,9 @@ kotlinxCoroutines = "1.11.0"
 activityCompose = "1.13.0"
 kotlin = "2.3.10"
 composeBom = "2026.02.01"
-
 room = "3.0.1"
 hilt = "2.60.1"
+litertlm = "0.15.0"
 
 # Navigation
 nav3Core = "1.1.5"
@@ -44,6 +44,8 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 
 hilt = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
+
+litertlm = { group = "com.google.ai.edge.litertlm", name = "litertlm-android", version.ref = "litertlm" }
 
 # Navigation
 androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "nav3Core" }

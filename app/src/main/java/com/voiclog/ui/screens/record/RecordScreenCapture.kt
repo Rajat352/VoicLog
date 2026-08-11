@@ -31,6 +31,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.voiclog.R
 import com.voiclog.ui.screens.record.state.CaptureState
+import com.voiclog.ui.screens.record.state.ProcessingStep
 import com.voiclog.ui.theme.Timer
 import com.voiclog.ui.theme.VoicLogTypography
 
@@ -51,6 +52,11 @@ fun RecordScreenCapture(
         Text(
             text = when(captureState) {
                 is CaptureState.Recording -> formatDuration(captureState.duration)
+                is CaptureState.Processing -> when(captureState.step) {
+                    ProcessingStep.LOADING_MODEL -> "Loading model..."
+                    ProcessingStep.TRANSCRIBING -> "Transcribing..."
+                    ProcessingStep.SUMMARIZING -> "Summarizing..."
+                }
                 else -> "Tap to say what you did today"
             },
             style = when(captureState) {
