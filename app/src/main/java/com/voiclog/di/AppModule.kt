@@ -5,6 +5,9 @@ import androidx.room3.Room
 import com.voiclog.data.AppDatabase
 import com.voiclog.data.audio.AudioRecorder
 import com.voiclog.data.audio.AudioRecorderImpl
+import com.voiclog.data.repository.ModelDownloadRepository
+import com.voiclog.data.summarization.Summarizer
+import com.voiclog.data.summarization.SummarizerImpl
 import com.voiclog.data.transcription.Transcriber
 import com.voiclog.data.transcription.TranscriberImpl
 import dagger.Module
@@ -38,5 +41,14 @@ object AppModule {
     @Provides
     fun provideTranscriber(@ApplicationContext context: Context) : Transcriber {
         return TranscriberImpl(context)
+    }
+
+    @Singleton
+    @Provides
+    fun provideSummarizer(
+        @ApplicationContext context: Context,
+        modelDownloadRepository: ModelDownloadRepository
+    ): Summarizer {
+        return SummarizerImpl(context, modelDownloadRepository)
     }
 }

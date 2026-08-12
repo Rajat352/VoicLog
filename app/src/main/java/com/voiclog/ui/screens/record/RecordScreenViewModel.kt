@@ -96,6 +96,8 @@ class RecordScreenViewModel @Inject constructor(
                             recordingRepository.createRecording(LocalDate.now()).onSuccess { id ->
                                 recordingRepository.getAndAddTranscription(id, audioData).onSuccess { text ->
                                     Log.d(TAG, text)
+                                    recordingRepository.getAndAddSummarization(id, text)
+                                    // Todo: Implement further
                                 }
                             }
                         }
